@@ -52,7 +52,7 @@ async def upload_document(file: UploadFile = File(...)):
 class URLRequest(BaseModel):
     url: str
 
-@app.post("/ingest-url")
+@app.post("/train/url")
 async def ingest_url_endpoint(request: URLRequest):
     try:
         from ingestion import ingest_url
