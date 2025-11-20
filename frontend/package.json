@@ -6,9 +6,7 @@
     "scripts": {
         "dev": "vite",
         "build": "vite build",
-        // [关键修改] 将 build 脚本替换为下面这一行
-        "deploy": "VITE_API_BASE_URL=https://api.docmind.com.au vite build",
-        "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+        "lint": "eslint ...",
         "preview": "vite preview"
     },
     "dependencies": {
