@@ -9,14 +9,19 @@ load_dotenv()
 
 app = FastAPI()
 
-# Add CORS middleware
+# 允许所有来源 (仅用于调试！)
+origins = ["*"] 
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=origins,   # <-- 确保这里是 origins 变量
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["*"], 
     allow_headers=["*"],
 )
+
+
+# (接下来是 class ChatRequest 和其他路由...)
 
 class ChatRequest(BaseModel):
     question: str
@@ -44,6 +49,18 @@ async def upload_document(file: UploadFile = File(...)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+class URLRequest(BaseModel):
+    url: str
+
+@app.post("/ingest-url")
+async def ingest_url_endpoint(request: URLRequest):
+    try:
+        from ingestion import ingest_url
+        num_chunks = await ingest_url(request.url)
+        return {"url": request.url, "status": "URL Ingested", "chunks": num_chunks}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/chat")
 async def chat(request: ChatRequest):
     try:
@@ -51,6 +68,7 @@ async def chat(request: ChatRequest):
         answer = query_rag(request.question)
         return {"answer": answer}
     except Exception as e:
+        print(f"Error in chat endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/train")

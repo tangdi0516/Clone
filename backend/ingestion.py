@@ -37,3 +37,19 @@ async def ingest_file(file_path: str):
     vectorstore.add_documents(splits)
     
     return len(splits)
+
+async def ingest_url(url: str):
+    from langchain_community.document_loaders import WebBaseLoader
+    
+    loader = WebBaseLoader(url)
+    documents = loader.load()
+    
+    # Split text
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+    splits = text_splitter.split_documents(documents)
+    
+    # Add to vector store
+    vectorstore = get_vectorstore()
+    vectorstore.add_documents(splits)
+    
+    return len(splits)
