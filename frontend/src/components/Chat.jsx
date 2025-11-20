@@ -1,14 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import { Send, Bot, User, Loader2 } from 'lucide-react';
+// 1. 引入 Clerk Hook
+import { useUser } from "@clerk/clerk-react";
 
 const Chat = () => {
+    // 2. 获取当前用户对象
+    const { user } = useUser();
+
     const [messages, setMessages] = useState([
         { role: 'assistant', content: 'Hello! I am your DocsBot clone. Ask me anything about your documents.' }
     ]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
     const messagesEndRef = useRef(null);
+
+    // 3. 使用环境变量获取后端地址
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -22,13 +30,29 @@ const Chat = () => {
         e.preventDefault();
         if (!input.trim() || loading) return;
 
+        if (!user) {
+            // 如果未登录（理论上 App.jsx 已拦截，但双重保险）
+            setMessages(prev => [...prev, { role: 'assistant', content: 'Please sign in to chat.' }]);
+            return;
+        }
+
         const userMessage = { role: 'user', content: input };
         setMessages(prev => [...prev, userMessage]);
         setInput('');
         setLoading(true);
 
         try {
-            const response = await axios.post('http://localhost:8000/chat', { question: input });
+            // 4. 发送请求时带上 user-id header
+            const response = await axios.post(`${API_BASE_URL}/chat`,
+                { question: userMessage.content },
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'user-id': user.id // [关键] 传递用户身份
+                    }
+                }
+            );
+
             const botMessage = { role: 'assistant', content: response.data.answer };
             setMessages(prev => [...prev, botMessage]);
         } catch (error) {

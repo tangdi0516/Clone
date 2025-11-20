@@ -1,13 +1,21 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { Upload as UploadIcon, File, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+// 1. 引入 Clerk Hook
+import { useUser } from "@clerk/clerk-react";
 
 const Upload = () => {
+    // 2. 获取当前用户对象
+    const { user } = useUser();
+
     const [mode, setMode] = useState('file'); // 'file' or 'url'
     const [file, setFile] = useState(null);
     const [url, setUrl] = useState('');
     const [status, setStatus] = useState('idle'); // idle, uploading, training, success, error
     const [message, setMessage] = useState('');
+
+    // 3. 使用环境变量获取后端地址 (兼容本地和线上)
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
     const handleFileChange = (e) => {
         if (e.target.files && e.target.files[0]) {
@@ -21,29 +29,47 @@ const Upload = () => {
         if (mode === 'file' && !file) return;
         if (mode === 'url' && !url) return;
 
+        if (!user) {
+            setMessage("User not authenticated");
+            return;
+        }
+
         setStatus('uploading');
 
         try {
+            // 准备请求头，放入 user-id
+            const authHeaders = {
+                'user-id': user.id
+            };
+
             if (mode === 'file') {
                 const formData = new FormData();
                 formData.append('file', file);
 
-                // Upload
-                await axios.post('http://localhost:8000/upload', formData, {
+                // Upload 文件
+                await axios.post(`${API_BASE_URL}/upload`, formData, {
                     headers: {
                         'Content-Type': 'multipart/form-data',
+                        ...authHeaders // [关键] 添加用户 ID
                     },
                 });
             } else {
-                // URL Ingestion
-                await axios.post('http://localhost:8000/ingest-url', { url });
+                // URL Ingestion (修正为后端定义的 /train/url 接口)
+                await axios.post(`${API_BASE_URL}/train/url`, { url }, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...authHeaders // [关键] 添加用户 ID
+                    }
+                });
             }
 
-            // Train (only needed for file upload in current backend logic, but consistent to call)
-            // For URL, ingestion happens in the endpoint, so we might skip explicit train call or keep it for consistency
-            // The backend /train endpoint is currently a dummy, so it's safe to call.
+            // 触发训练 (如果是 Dummy 接口也带上 ID 以防万一)
+            // 注意：URL 模式下 /train/url 其实已经处理了 ingestion，这里可以只在 file 模式调用，
+            // 或者后端 /train 只是个空接口也没关系。
             setStatus('training');
-            await axios.post('http://localhost:8000/train');
+            await axios.post(`${API_BASE_URL}/train`, {}, {
+                headers: authHeaders
+            });
 
             setStatus('success');
             setMessage(mode === 'file' ? 'Document uploaded and indexed successfully!' : 'URL content ingested successfully!');
